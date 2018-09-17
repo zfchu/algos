@@ -11,7 +11,7 @@ def hanoi(n, source, helper, target):
         # move tower of size n-1 from helper to target
         hanoi(n - 1, helper, source, target)
         
-source = ([4,3,2,1], "A")
+source = ([5,4,3,2,1], "A")
 #source = ([2,1], "source")
 target = ([], "C")
 helper = ([], "B")
