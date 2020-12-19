@@ -1,0 +1,133 @@
+//Based on divide and conquer algorithm
+module maxsubmax#(
+parameter DW = 8
+)
+(
+input clk,
+input [32*DW-1 :0] din,
+output [DW-1:0] max1,
+output [DW-1:0] max2
+);
+ 
+wire[DW-1:0] d[31:0];
+generate
+    genvar i;
+    for(i=0;i<32;i=i+1)
+    begin:loop_assign
+        assign d[i] = din[DW*i+DW-1:DW*i];
+    end
+endgenerate
+ 
+// stage 1,comp
+reg[DW-1:0] s1_max[15:0];
+reg[DW-1:0] s1_min[15:0];
+generate
+    for(i=0;i<16;i=i+1)
+    begin:loop_comp
+        always@(posedge clk)
+            if(d[2*i]>d[2*i+1])begin
+                s1_max[i] <= d[2*i];
+                s1_min[i] <= d[2*i+1];
+            end
+            else begin
+                s1_max[i] <= d[2*i+1];
+                s1_min[i] <= d[2*i];        
+            end
+    end
+endgenerate
+ 
+// stage 2,
+wire[DW-1:0] s2_max[7:0];
+wire[DW-1:0] s2_min[7:0];
+generate
+    for(i=0;i<8;i=i+1)
+    begin:loop_megs2
+        meg u_s2meg(
+            .clk(clk),
+            .g1_max(s1_max[2*i]),
+            .g1_min(s1_min[2*i]),
+            .g2_max(s1_max[2*i+1]),
+            .g2_min(s1_min[2*i+1]),            
+            .max1(s2_max[i]),
+            .max2(s2_min[i])
+        );
+    end
+endgenerate
+// stage 3,
+wire[DW-1:0] s3_max[3:0];
+wire[DW-1:0] s3_min[3:0];
+generate
+    for(i=0;i<4;i=i+1)
+    begin:loop_megs3
+        meg u_s3meg(
+            .clk(clk),
+            .g1_max(s2_max[2*i]),
+            .g1_min(s2_min[2*i]),
+            .g2_max(s2_max[2*i+1]),
+            .g2_min(s2_min[2*i+1]),            
+            .max1(s3_max[i]),
+            .max2(s3_min[i])
+        );
+    end
+endgenerate
+ 
+// stage 4,
+wire[DW-1:0] s4_max[1:0];
+wire[DW-1:0] s4_min[1:0];
+generate
+    for(i=0;i<2;i=i+1)
+    begin:loop_megs4
+        meg u_s4meg(
+            .clk(clk),
+            .g1_max(s3_max[2*i]),
+            .g1_min(s3_min[2*i]),
+            .g2_max(s3_max[2*i+1]),
+            .g2_min(s3_min[2*i+1]),            
+            .max1(s4_max[i]),
+            .max2(s4_min[i])
+        );
+    end
+endgenerate
+ 
+// stage 5,
+meg u_s5meg(
+    .clk(clk),
+    .g1_max(s4_max[0]),
+    .g1_min(s4_min[0]),
+    .g2_max(s4_max[1]),
+    .g2_min(s4_min[1]),            
+    .max1(max1),
+    .max2(max2)
+);
+endmodule
+ 
+module meg#(
+parameter DW = 8
+)
+(
+input clk,
+input [DW-1 :0] g1_max,
+input [DW-1 :0] g1_min,
+input [DW-1 :0] g2_max,
+input [DW-1 :0] g2_min,
+output reg [DW-1:0] max1,
+output reg [DW-1:0] max2
+);
+always@(posedge clk)
+begin
+    if(g1_max>g2_max) begin
+        max1 <= g1_max;
+        if(g2_max>g1_min)
+            max2 <= g2_max;
+        else
+            max2 <= g1_min;
+    end
+    else begin
+        max1 <= g2_max;
+        if(g1_max>g2_min)
+            max2 <= g1_max;
+        else
+            max2 <= g2_min;
+    end
+end
+endmodule
